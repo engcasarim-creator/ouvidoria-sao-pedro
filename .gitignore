@@ -1,0 +1,13 @@
+# Dependências do Node (se houver)
+node_modules/
+
+# Arquivos do ambiente XAMPP / Sistema Operacional
+Thumbs.db
+.DS_Store
+
+# Configurações do VS Code
+.vscode/
+
+# Arquivos compilados do JS (já que o TypeScript é a fonte principal)
+# Opcional: Se quiser manter o JS no GitHub para rodar direto no XAMPP de outros computadores, pode remover a linha abaixo.
+# assets/js/
