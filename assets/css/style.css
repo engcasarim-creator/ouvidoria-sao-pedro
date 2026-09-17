@@ -1,0 +1,54 @@
+/* Personalização do Tema Municipal */
+:root {
+    --cor-principal: #004a99;
+    --cor-secundaria: #002e66;
+    --cor-fundo: #f4f6f9;
+}
+
+body {
+    background-color: var(--cor-fundo);
+    font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+}
+
+/* Navbar */
+.navbar-custom {
+    background-color: var(--cor-principal) !important;
+}
+
+.logo-brasao {
+    max-height: 45px;
+    width: auto;
+    object-fit: contain;
+}
+
+/* Banner da Cidade */
+.banner-ouvidoria {
+    background: linear-gradient(rgba(0, 0, 0, 0.4), rgba(0, 0, 0, 0.6)), url('../../imagens/Banner.jpg') no-repeat center center;
+    background-size: cover;
+    color: #ffffff;
+    border-radius: 12px;
+    padding: 3.5rem 2rem;
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+}
+
+.banner-ouvidoria h1 {
+    font-weight: 700;
+    text-shadow: 2px 2px 4px rgba(0, 0, 0, 0.6);
+}
+
+.banner-ouvidoria p {
+    text-shadow: 1px 1px 3px rgba(0, 0, 0, 0.6);
+}
+
+/* Formatação dos Cards */
+.card {
+    border: none;
+    border-radius: 12px;
+}
+
+.card-header-custom {
+    background-color: var(--cor-principal);
+    color: #ffffff;
+    border-top-left-radius: 12px !important;
+    border-top-right-radius: 12px !important;
+}
