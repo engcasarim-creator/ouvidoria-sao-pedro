@@ -1,13 +1,32 @@
-# Dependências do Node (se houver)
-node_modules/
+# ==========================================
+# 1. SEGURANÇA E CREDENCIAIS (NÃO SUBIR)
+# ==========================================
+# Ignora as credenciais do banco MySQL
+config/database.php
+.env
+*.env
 
-# Arquivos do ambiente XAMPP / Sistema Operacional
+# Ignora o script de reset/geração de senha padrão do admin
+gerar_senha.php
+
+# ==========================================
+# 2. DADOS E UPLOADS DE MUNÍCIPES (LGPD)
+# ==========================================
+# Ignora anexos e fotos enviados no sistema
+uploads/*
+!uploads/.gitkeep
+
+# ==========================================
+# 3. AMBIENTE E EDITORES DE CÓDIGO
+# ==========================================
+node_modules/
+.vscode/
+.idea/
 Thumbs.db
 .DS_Store
 
-# Configurações do VS Code
-.vscode/
-
-# Arquivos compilados do JS (já que o TypeScript é a fonte principal)
-# Opcional: Se quiser manter o JS no GitHub para rodar direto no XAMPP de outros computadores, pode remover a linha abaixo.
-# assets/js/
+# ==========================================
+# 4. ARCHIVOS COMPILADOS TS / MAPS
+# ==========================================
+# Ignora apenas os source maps do JS
+assets/js/*.js.map

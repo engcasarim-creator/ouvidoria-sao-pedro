@@ -1,6 +1,7 @@
-// Define os status e tipos possíveis como tipos literais
+// Define os status, tipos e canais possíveis como tipos literais
 export type TipoManifestacao = 'anonimo' | 'identificado';
-export type StatusManifestacao = 'Pendente' | 'Respondida' | 'Cancelada';
+export type StatusManifestacao = 'Pendente' | 'Respondida' | 'Arquivada' | 'Cancelada';
+export type CanalResposta = 'email' | 'telefone_whatsapp'; // <-- NOVO
 
 /**
  * Interface que representa uma Secretaria Municipal de São Pedro do Paraná
@@ -38,6 +39,7 @@ export interface Manifestacao {
     anexo_url?: string;
     status: StatusManifestacao;
     resposta?: string;
+    canal_resposta?: CanalResposta; // <-- NOVO
     data_resposta?: string;
     dias_atendimento: number;
     data_criacao: string;

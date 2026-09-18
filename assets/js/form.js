@@ -9,7 +9,6 @@ class FormOuvidoria {
         this.init();
     }
     init() {
-        // Mapeamento seguro de elementos do DOM
         this.formElement = document.getElementById('formOuvidoria');
         this.secaoIdentificacao = document.getElementById('secaoIdentificacao');
         this.radioIdentificado = document.getElementById('tipoIdentificado');
@@ -32,10 +31,6 @@ class FormOuvidoria {
             this.formElement.addEventListener('submit', (e) => this.enviarFormulario(e));
         }
     }
-    /**
-     * Alterna a visibilidade e obrigatoriedade dos campos de e-mail e telefone
-     * quando o munícipe escolhe entre Reclamação Identificada ou Anônima.
-     */
     atualizarVisibilidadeIdentificacao() {
         var _a;
         var _b;
@@ -43,7 +38,6 @@ class FormOuvidoria {
         if (this.secaoIdentificacao) {
             if (isAnonimo) {
                 this.secaoIdentificacao.classList.add('d-none');
-                // Remove a obrigatoriedade dos campos
                 if (this.inputEmail)
                     this.inputEmail.required = false;
                 if (this.inputTelefone)
@@ -51,7 +45,6 @@ class FormOuvidoria {
             }
             else {
                 this.secaoIdentificacao.classList.remove('d-none');
-                // Reverte a obrigatoriedade dos campos para manifestações identificadas
                 if (this.inputEmail)
                     this.inputEmail.required = true;
                 if (this.inputTelefone)
@@ -59,9 +52,6 @@ class FormOuvidoria {
             }
         }
     }
-    /**
-     * Envio assíncrono via fetch tratando os cenários de sucesso e exceção com try/catch
-     */
     async enviarFormulario(e) {
         var _a, _b, _c, _d;
         var _e;
@@ -70,7 +60,6 @@ class FormOuvidoria {
             return;
         const formData = new FormData(this.formElement);
         const isAnonimo = (_e = (_a = this.radioAnonimo) === null || _a === void 0 ? void 0 : _a.checked) !== null && _e !== void 0 ? _e : false;
-        // Validação adicional de segurança no front-end
         if (!isAnonimo) {
             const emailVal = (_b = this.inputEmail) === null || _b === void 0 ? void 0 : _b.value.trim();
             const telVal = (_c = this.inputTelefone) === null || _c === void 0 ? void 0 : _c.value.trim();
@@ -80,18 +69,26 @@ class FormOuvidoria {
             }
         }
         try {
-            const response = await fetch('/api/manifestacoes.php', {
+            // Garante o caminho relativo correto independentemente da rota atual
+            const apiUrl = window.location.pathname.replace(/\/[^\/]*$/, '/api/manifestacoes.php');
+            const response = await fetch(apiUrl, {
                 method: 'POST',
                 body: formData
             });
-            const resultado = await response.json();
+            // Converte a resposta em texto primeiro para evitar exceção de parse de JSON caso o servidor devolva erro HTML
+            const textResponse = await response.text();
+            let resultado;
+            try {
+                resultado = JSON.parse(textResponse);
+            }
+            catch (_f) {
+                throw new Error('O servidor respondeu com um formato inválido. Verifique se o caminho da API e o PHP estão corretos.');
+            }
             if (!response.ok || !resultado.sucesso) {
                 throw new Error(resultado.mensagem || 'Falha ao cadastrar reclamação.');
             }
-            // Exibe mensagem com o protocolo gerado
             const protocolo = ((_d = resultado.dados) === null || _d === void 0 ? void 0 : _d.protocolo) || 'N/A';
             alert(`Sua reclamação foi registrada com sucesso!\n\nNúmero do Protocolo: ${protocolo}`);
-            // Reseta o formulário
             this.formElement.reset();
             this.atualizarVisibilidadeIdentificacao();
         }
@@ -102,7 +99,6 @@ class FormOuvidoria {
         }
     }
 }
-// Inicializa o controle do formulário no carregamento do DOM
 document.addEventListener('DOMContentLoaded', () => {
     new FormOuvidoria();
 });

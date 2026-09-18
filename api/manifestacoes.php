@@ -1,187 +1,200 @@
 <?php
+ini_set('display_errors', 0);
+error_reporting(E_ALL);
+
 header('Content-Type: application/json; charset=utf-8');
 
 require_once __DIR__ . '/../config/database.php';
 
-$database = new Database();
-$db = $database->getConnection();
-$metodo = $_SERVER['REQUEST_METHOD'];
-
 try {
-    switch ($metodo) {
+    $database = new Database();
+    $db = $database->getConnection();
+    $metodo = $_SERVER['REQUEST_METHOD'];
 
-        // =========================================================================
-        // GET: Lista as manifestações chamando a Stored Procedure ou View Analítica
-        // =========================================================================
-        case 'GET':
-            $secretaria_id = isset($_GET['secretaria_id']) && $_GET['secretaria_id'] !== '' ? (int)$_GET['secretaria_id'] : null;
-            $status = isset($_GET['status']) && $_GET['status'] !== '' ? $_GET['status'] : null;
-            $data_inicio = isset($_GET['data_inicio']) && $_GET['data_inicio'] !== '' ? $_GET['data_inicio'] : null;
-            $data_fim = isset($_GET['data_fim']) && $_GET['data_fim'] !== '' ? $_GET['data_fim'] : null;
+    if ($metodo === 'POST') {
+        $tipo = $_POST['tipo_identificacao'] ?? 'anonimo';
+        
+        $nome = ($tipo === 'identificado' && !empty($_POST['nome'])) ? trim($_POST['nome']) : null;
+        $email = ($tipo === 'identificado' && !empty($_POST['email'])) ? trim($_POST['email']) : null;
+        $telefone = ($tipo === 'identificado' && !empty($_POST['telefone'])) ? trim($_POST['telefone']) : null;
+        
+        $secretaria_id = !empty($_POST['secretaria_id']) ? intval($_POST['secretaria_id']) : null;
+        $tema_id = !empty($_POST['tema_id']) ? intval($_POST['tema_id']) : null;
+        $descricao = !empty($_POST['descricao']) ? trim($_POST['descricao']) : null;
 
-            // Chamada limpa (CALL) à Stored Procedure otimizada
-            $sql = "CALL sp_filtrar_ouvidoria(:secretaria_id, :status, :data_inicio, :data_fim)";
-            $stmt = $db->prepare($sql);
-            
-            $stmt->bindValue(':secretaria_id', $secretaria_id, $secretaria_id ? PDO::PARAM_INT : PDO::PARAM_NULL);
-            $stmt->bindValue(':status', $status, $status ? PDO::PARAM_STR : PDO::PARAM_NULL);
-            $stmt->bindValue(':data_inicio', $data_inicio, $data_inicio ? PDO::PARAM_STR : PDO::PARAM_NULL);
-            $stmt->bindValue(':data_fim', $data_fim, $data_fim ? PDO::PARAM_STR : PDO::PARAM_NULL);
+        if (!$secretaria_id || !$tema_id || !$descricao) {
+            http_response_code(400);
+            echo json_encode(["sucesso" => false, "mensagem" => "Preencha todos os campos obrigatórios."]);
+            exit;
+        }
 
-            $stmt->execute();
-            $manifestacoes = $stmt->fetchAll(PDO::FETCH_ASSOC);
+        $protocolo = 'M' . date('Ymd') . '-' . strtoupper(substr(md5(uniqid()), 0, 4));
 
-            echo json_encode($manifestacoes);
-            break;
+        $sql = "INSERT INTO manifestacoes (protocolo, tipo, nome, email, telefone, secretaria_id, tema_id, descricao, status) 
+                VALUES (:protocolo, :tipo, :nome, :email, :telefone, :secretaria_id, :tema_id, :descricao, 'Pendente')";
 
-        // =========================================================================
-        // POST: Cria uma nova reclamação do munícipe (Anônima ou Identificada)
-        // =========================================================================
-        case 'POST':
-            $tipo = $_POST['tipo_identificacao'] ?? 'identificado';
-            $nome = $tipo === 'identificado' ? ($_POST['nome'] ?? null) : null;
-            $email = $tipo === 'identificado' ? ($_POST['email'] ?? null) : null;
-            $telefone = $tipo === 'identificado' ? ($_POST['telefone'] ?? null) : null;
-            $secretaria_id = (int)($_POST['secretaria_id'] ?? 0);
-            $tema_id = (int)($_POST['tema_id'] ?? 0);
-            $descricao = trim($_POST['descricao'] ?? '');
+        $stmt = $db->prepare($sql);
+        $stmt->bindValue(':protocolo', $protocolo);
+        $stmt->bindValue(':tipo', $tipo);
+        $stmt->bindValue(':nome', $nome, $nome === null ? PDO::PARAM_NULL : PDO::PARAM_STR);
+        $stmt->bindValue(':email', $email, $email === null ? PDO::PARAM_NULL : PDO::PARAM_STR);
+        $stmt->bindValue(':telefone', $telefone, $telefone === null ? PDO::PARAM_NULL : PDO::PARAM_STR);
+        $stmt->bindValue(':secretaria_id', $secretaria_id, PDO::PARAM_INT);
+        $stmt->bindValue(':tema_id', $tema_id, PDO::PARAM_INT);
+        $stmt->bindValue(':descricao', $descricao);
 
-            if (!$secretaria_id || !$tema_id || empty($descricao)) {
-                http_response_code(400);
-                echo json_encode([
-                    "sucesso" => false,
-                    "mensagem" => "Por favor, preencha todos os campos obrigatórios."
-                ]);
-                exit;
-            }
-
-            // Geração de protocolo formatado temporário
-            $ano = date('Y');
-            $queryCount = $db->query("SELECT COUNT(*) as total FROM manifestacoes");
-            $total = $queryCount->fetch()['total'] + 1;
-            $protocolo = sprintf("OUV-%05d/%d", $total, $ano);
-
-            $sqlInsert = "INSERT INTO manifestacoes (protocolo, tipo, nome, email, telefone, secretaria_id, tema_id, descricao, status)
-                          VALUES (:protocolo, :tipo, :nome, :email, :telefone, :secretaria_id, :tema_id, :descricao, 'Pendente')";
-
-            $stmtInsert = $db->prepare($sqlInsert);
-            $stmtInsert->bindParam(':protocolo', $protocolo);
-            $stmtInsert->bindParam(':tipo', $tipo);
-            $stmtInsert->bindParam(':nome', $nome);
-            $stmtInsert->bindParam(':email', $email);
-            $stmtInsert->bindParam(':telefone', $telefone);
-            $stmtInsert->bindParam(':secretaria_id', $secretaria_id, PDO::PARAM_INT);
-            $stmtInsert->bindParam(':tema_id', $tema_id, PDO::PARAM_INT);
-            $stmtInsert->bindParam(':descricao', $descricao);
-
-            $stmtInsert->execute();
-
+        if ($stmt->execute()) {
             http_response_code(201);
             echo json_encode([
                 "sucesso" => true,
                 "mensagem" => "Manifestação cadastrada com sucesso!",
                 "dados" => ["protocolo" => $protocolo]
             ]);
-            break;
+        } else {
+            throw new Exception("Não foi possível salvar a manifestação.");
+        }
 
-        // =========================================================================
-        // PUT: Salva a resposta oficial do Administrador
-        // =========================================================================
-        case 'PUT':
-            $dados = json_decode(file_get_contents("php://input"), true);
-            $id = (int)($dados['id'] ?? 0);
-            $resposta = trim($dados['resposta'] ?? '');
+    } elseif ($metodo === 'GET') {
+        $sql = "SELECT m.*, s.nome as secretaria_nome, t.nome as tema_nome 
+                FROM manifestacoes m 
+                LEFT JOIN secretarias s ON m.secretaria_id = s.id 
+                LEFT JOIN temas t ON m.tema_id = t.id 
+                WHERE 1=1";
 
-            if (!$id || empty($resposta)) {
-                http_response_code(400);
-                echo json_encode([
-                    "sucesso" => false,
-                    "mensagem" => "ID e texto da resposta são obrigatórios."
-                ]);
-                exit;
+        $params = [];
+
+        // FILTRO DE ABAS: 'arquivadas' vs 'ativas' (Padrão)
+        $exibir = $_GET['exibir'] ?? 'ativas';
+        if ($exibir === 'arquivadas') {
+            $sql .= " AND m.status = 'Arquivada'";
+        } else {
+            // Em 'ativas', mostra apenas as 'Pendente' e 'Respondida' (oculta as Arquivadas)
+            $sql .= " AND m.status != 'Arquivada'";
+        }
+
+        if (!empty($_GET['id'])) {
+            $sql .= " AND m.id = :id";
+            $params[':id'] = $_GET['id'];
+        }
+
+        if (!empty($_GET['secretaria_id'])) {
+            $sql .= " AND m.secretaria_id = :secretaria_id";
+            $params[':secretaria_id'] = $_GET['secretaria_id'];
+        }
+
+        if (!empty($_GET['data_inicio'])) {
+            $sql .= " AND DATE(m.data_criacao) >= :data_inicio";
+            $params[':data_inicio'] = $_GET['data_inicio'];
+        }
+
+        if (!empty($_GET['data_fim'])) {
+            $sql .= " AND DATE(m.data_criacao) <= :data_fim";
+            $params[':data_fim'] = $_GET['data_fim'];
+        }
+
+        $sql .= " ORDER BY m.data_criacao DESC";
+
+        $stmt = $db->prepare($sql);
+        $stmt->execute($params);
+        $resultados = $stmt->fetchAll(PDO::FETCH_ASSOC);
+
+        echo json_encode($resultados);
+
+    } elseif ($metodo === 'PUT') {
+        $dados = json_decode(file_get_contents("php://input"), true);
+        $id = $dados['id'] ?? null;
+        $acao = $dados['acao'] ?? null;
+
+        if (!$id) {
+            http_response_code(400);
+            echo json_encode(["sucesso" => false, "mensagem" => "ID é obrigatório."]);
+            exit;
+        }
+
+        // SE FOR AÇÃO DE ARQUIVAR
+        if ($acao === 'arquivar') {
+            $sql = "UPDATE manifestacoes SET status = 'Arquivada' WHERE id = :id";
+            $stmt = $db->prepare($sql);
+            $stmt->bindValue(':id', $id, PDO::PARAM_INT);
+
+            if ($stmt->execute()) {
+                echo json_encode(["sucesso" => true, "mensagem" => "Manifestação arquivada com sucesso!"]);
+            } else {
+                throw new Exception("Falha ao arquivar manifestação.");
+            }
+            exit;
+        }
+
+        // SE FOR AÇÃO DE RESPONDER (Exige o campo resposta)
+        $resposta = $dados['resposta'] ?? null;
+        $canal_resposta = $dados['canal_resposta'] ?? 'Telefone / WhatsApp';
+
+        if (!$resposta) {
+            http_response_code(400);
+            echo json_encode(["sucesso" => false, "mensagem" => "A resposta é obrigatória."]);
+            exit;
+        }
+
+        $sql = "UPDATE manifestacoes SET resposta = :resposta, canal_resposta = :canal_resposta, status = 'Respondida', data_resposta = NOW() WHERE id = :id";
+        $stmt = $db->prepare($sql);
+        $stmt->bindValue(':resposta', $resposta);
+        $stmt->bindValue(':canal_resposta', $canal_resposta);
+        $stmt->bindValue(':id', $id, PDO::PARAM_INT);
+
+        if ($stmt->execute()) {
+            // Dispara e-mail se o canal escolhido for E-mail
+            if ($canal_resposta === 'E-mail') {
+                $stmtGet = $db->prepare("SELECT email, protocolo, nome FROM manifestacoes WHERE id = :id");
+                $stmtGet->bindValue(':id', $id, PDO::PARAM_INT);
+                $stmtGet->execute();
+                $m = $stmtGet->fetch(PDO::FETCH_ASSOC);
+
+                if ($m && !empty($m['email'])) {
+                    $to = $m['email'];
+                    $subject = "Ouvidoria Municipal - Resposta ao Protocolo " . $m['protocolo'];
+                    $body = "Olá " . ($m['nome'] ?? 'Cidadão') . ",\n\nSua manifestação (Protocolo: {$m['protocolo']}) foi respondida pela Ouvidoria:\n\n\"{$resposta}\"\n\nAtenciosamente,\nOuvidoria Municipal de São Pedro do Paraná";
+                    $headers = "From: ouvidoria@saopedrodoparana.pr.gov.br\r\nContent-Type: text/plain; charset=UTF-8";
+                    
+                    @mail($to, $subject, $body, $headers);
+                }
             }
 
-            // Calcula a diferença de dias para atendimento
-            $sqlCalc = "UPDATE manifestacoes 
-                        SET resposta = :resposta, 
-                            status = 'Respondida', 
-                            data_resposta = NOW(),
-                            dias_atendimento = DATEDIFF(NOW(), data_criacao)
-                        WHERE id = :id";
+            echo json_encode(["sucesso" => true, "mensagem" => "Resposta gravada com sucesso!"]);
+        } else {
+            throw new Exception("Falha ao atualizar resposta.");
+        }
 
-            $stmtUpdate = $db->prepare($sqlCalc);
-            $stmtUpdate->bindParam(':resposta', $resposta);
-            $stmtUpdate->bindParam(':id', $id, PDO::PARAM_INT);
-            $stmtUpdate->execute();
+    } elseif ($metodo === 'DELETE') {
+        $id = $_GET['id'] ?? null;
 
-            echo json_encode([
-                "sucesso" => true,
-                "mensagem" => "Resposta gravada com sucesso!"
-            ]);
-            break;
+        if (!$id) {
+            http_response_code(400);
+            echo json_encode(["sucesso" => false, "mensagem" => "ID é obrigatório."]);
+            exit;
+        }
 
-        // =========================================================================
-        // DELETE: Exclui uma manifestação aplicando regras de negócio
-        // =========================================================================
-        case 'DELETE':
-            $id = (int)($_GET['id'] ?? 0);
+        $stmtCheck = $db->prepare("SELECT status FROM manifestacoes WHERE id = :id");
+        $stmtCheck->bindValue(':id', $id, PDO::PARAM_INT);
+        $stmtCheck->execute();
+        $manifestacao = $stmtCheck->fetch(PDO::FETCH_ASSOC);
 
-            if (!$id) {
-                http_response_code(400);
-                echo json_encode([
-                    "sucesso" => false,
-                    "mensagem" => "ID inválido para exclusão."
-                ]);
-                exit;
-            }
+        if ($manifestacao && $manifestacao['status'] === 'Respondida') {
+            http_response_code(422);
+            echo json_encode(["sucesso" => false, "mensagem" => "Regra de Negócio: Não é permitido excluir uma reclamação que já foi respondida."]);
+            exit;
+        }
 
-            // Regra de exclusão da rubrica: Checar status antes de excluir
-            $stmtCheck = $db->prepare("SELECT status FROM manifestacoes WHERE id = :id");
-            $stmtCheck->bindParam(':id', $id, PDO::PARAM_INT);
-            $stmtCheck->execute();
-            $item = $stmtCheck->fetch();
+        $stmt = $db->prepare("DELETE FROM manifestacoes WHERE id = :id");
+        $stmt->bindValue(':id', $id, PDO::PARAM_INT);
 
-            if (!$item) {
-                http_response_code(444);
-                echo json_encode([
-                    "sucesso" => false,
-                    "mensagem" => "Reclamação não encontrada."
-                ]);
-                exit;
-            }
-
-            if ($item['status'] === 'Respondida') {
-                http_response_code(400);
-                echo json_encode([
-                    "sucesso" => false,
-                    "mensagem" => "Regra de exclusão: Esta reclamação já foi respondida e não pode ser excluída do histórico oficial por auditoria."
-                ]);
-                exit;
-            }
-
-            // Executa a exclusão física se o item for 'Pendente'
-            $stmtDelete = $db->prepare("DELETE FROM manifestacoes WHERE id = :id");
-            $stmtDelete->bindParam(':id', $id, PDO::PARAM_INT);
-            $stmtDelete->execute();
-
-            echo json_encode([
-                "sucesso" => true,
-                "mensagem" => "Reclamação excluída com sucesso."
-            ]);
-            break;
-
-        default:
-            http_response_code(405);
-            echo json_encode([
-                "sucesso" => false,
-                "mensagem" => "Método HTTP não permitido."
-            ]);
-            break;
+        if ($stmt->execute()) {
+            echo json_encode(["sucesso" => true, "mensagem" => "Manifestação excluída com sucesso!"]);
+        } else {
+            throw new Exception("Falha ao excluir.");
+        }
     }
-} catch (PDOException $e) {
+
+} catch (Exception $e) {
     http_response_code(500);
-    echo json_encode([
-        "sucesso" => false,
-        "mensagem" => "Erro de Banco de Dados: " . $e->getMessage()
-    ]);
+    echo json_encode(["sucesso" => false, "mensagem" => "Erro de servidor: " . $e->getMessage()]);
 }

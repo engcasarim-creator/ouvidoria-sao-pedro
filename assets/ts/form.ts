@@ -13,7 +13,6 @@ class FormOuvidoria {
     }
 
     private init(): void {
-        // Mapeamento seguro de elementos do DOM
         this.formElement = document.getElementById('formOuvidoria') as HTMLFormElement | null;
         this.secaoIdentificacao = document.getElementById('secaoIdentificacao');
         this.radioIdentificado = document.getElementById('tipoIdentificado') as HTMLInputElement | null;
@@ -41,10 +40,6 @@ class FormOuvidoria {
         }
     }
 
-    /**
-     * Alterna a visibilidade e obrigatoriedade dos campos de e-mail e telefone
-     * quando o munícipe escolhe entre Reclamação Identificada ou Anônima.
-     */
     private atualizarVisibilidadeIdentificacao(): void {
         const isAnonimo = this.radioAnonimo?.checked ?? false;
 
@@ -52,22 +47,17 @@ class FormOuvidoria {
             if (isAnonimo) {
                 this.secaoIdentificacao.classList.add('d-none');
                 
-                // Remove a obrigatoriedade dos campos
                 if (this.inputEmail) this.inputEmail.required = false;
                 if (this.inputTelefone) this.inputTelefone.required = false;
             } else {
                 this.secaoIdentificacao.classList.remove('d-none');
                 
-                // Reverte a obrigatoriedade dos campos para manifestações identificadas
                 if (this.inputEmail) this.inputEmail.required = true;
                 if (this.inputTelefone) this.inputTelefone.required = true;
             }
         }
     }
 
-    /**
-     * Envio assíncrono via fetch tratando os cenários de sucesso e exceção com try/catch
-     */
     private async enviarFormulario(e: Event): Promise<void> {
         e.preventDefault();
 
@@ -76,7 +66,6 @@ class FormOuvidoria {
         const formData = new FormData(this.formElement);
         const isAnonimo = this.radioAnonimo?.checked ?? false;
 
-        // Validação adicional de segurança no front-end
         if (!isAnonimo) {
             const emailVal = this.inputEmail?.value.trim();
             const telVal = this.inputTelefone?.value.trim();
@@ -88,22 +77,31 @@ class FormOuvidoria {
         }
 
         try {
-            const response = await fetch('/api/manifestacoes.php', {
+            // Garante o caminho relativo correto independentemente da rota atual
+            const apiUrl = window.location.pathname.replace(/\/[^\/]*$/, '/api/manifestacoes.php');
+
+            const response = await fetch(apiUrl, {
                 method: 'POST',
                 body: formData
             });
 
-            const resultado: ApiResponse<{ protocolo: string }> = await response.json();
+            // Converte a resposta em texto primeiro para evitar exceção de parse de JSON caso o servidor devolva erro HTML
+            const textResponse = await response.text();
+            let resultado: ApiResponse<{ protocolo: string }>;
+
+            try {
+                resultado = JSON.parse(textResponse);
+            } catch {
+                throw new Error('O servidor respondeu com um formato inválido. Verifique se o caminho da API e o PHP estão corretos.');
+            }
 
             if (!response.ok || !resultado.sucesso) {
                 throw new Error(resultado.mensagem || 'Falha ao cadastrar reclamação.');
             }
 
-            // Exibe mensagem com o protocolo gerado
             const protocolo = resultado.dados?.protocolo || 'N/A';
             alert(`Sua reclamação foi registrada com sucesso!\n\nNúmero do Protocolo: ${protocolo}`);
 
-            // Reseta o formulário
             this.formElement.reset();
             this.atualizarVisibilidadeIdentificacao();
 
@@ -115,7 +113,6 @@ class FormOuvidoria {
     }
 }
 
-// Inicializa o controle do formulário no carregamento do DOM
 document.addEventListener('DOMContentLoaded', () => {
     new FormOuvidoria();
 });
