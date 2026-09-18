@@ -4,6 +4,16 @@ import {
     CanalResposta 
 } from './interfaces.js';
 
+// Formato paginado devolvido por api/manifestacoes.php (GET),
+// que agora chama sp_listar_manifestacoes / sp_contar_manifestacoes.
+interface ListaPaginadaManifestacoes {
+    dados: Manifestacao[];
+    pagina: number;
+    por_pagina: number;
+    total: number;
+    paginas: number;
+}
+
 // Declaração global para manipular modais do Bootstrap 5
 declare const bootstrap: {
     Modal: {
@@ -205,13 +215,17 @@ class DashboardOuvidoria {
         if (secretaria) params.append('secretaria_id', secretaria);
         if (inicio) params.append('data_inicio', inicio);
         if (fim) params.append('data_fim', fim);
+        // O dashboard ainda não tem botões de página: pede tudo de uma vez
+        // para os cards (reduce) e a tabela continuarem completos.
+        params.append('por_pagina', '1000');
 
         try {
             const response = await fetch(`api/manifestacoes.php?${params.toString()}`);
             if (!response.ok) throw new Error('Erro na comunicação');
 
-            this.manifestacoes = await response.json();
-            
+            const lista = await response.json() as ListaPaginadaManifestacoes;
+            this.manifestacoes = lista.dados;
+
             // Recalcula os cards e a contagem com base exata na lista retornada
             this.atualizarMetricsComReduce();
             this.renderizarTabela();

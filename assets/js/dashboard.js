@@ -176,11 +176,15 @@ class DashboardOuvidoria {
             params.append('data_inicio', inicio);
         if (fim)
             params.append('data_fim', fim);
+        // O dashboard ainda não tem botões de página: pede tudo de uma vez
+        // para os cards (reduce) e a tabela continuarem completos.
+        params.append('por_pagina', '1000');
         try {
             const response = await fetch(`api/manifestacoes.php?${params.toString()}`);
             if (!response.ok)
                 throw new Error('Erro na comunicação');
-            this.manifestacoes = await response.json();
+            const lista = await response.json();
+            this.manifestacoes = lista.dados;
             // Recalcula os cards e a contagem com base exata na lista retornada
             this.atualizarMetricsComReduce();
             this.renderizarTabela();

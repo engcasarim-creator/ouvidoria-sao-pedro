@@ -55,50 +55,44 @@ try {
         }
 
     } elseif ($metodo === 'GET') {
-        $sql = "SELECT m.*, s.nome as secretaria_nome, t.nome as tema_nome 
-                FROM manifestacoes m 
-                LEFT JOIN secretarias s ON m.secretaria_id = s.id 
-                LEFT JOIN temas t ON m.tema_id = t.id 
-                WHERE 1=1";
+        $pagina     = isset($_GET['pagina'])     ? max(1, (int) $_GET['pagina'])      : 1;
+$porPagina  = isset($_GET['por_pagina']) ? max(1, (int) $_GET['por_pagina'])  : 10;
 
-        $params = [];
+// Chamada limpa à procedure: nenhum SQL montado no PHP
+$stmt = $db->prepare("CALL sp_listar_manifestacoes(?, ?, ?, ?, ?, ?, ?, ?)");
+$stmt->execute([
+    $_GET['exibir']        ?? 'ativas',
+    !empty($_GET['secretaria_id']) ? (int) $_GET['secretaria_id'] : null,
+    !empty($_GET['status'])        ? $_GET['status']              : null,
+    !empty($_GET['busca'])         ? $_GET['busca']               : null,
+    !empty($_GET['data_inicio'])   ? $_GET['data_inicio']         : null,
+    !empty($_GET['data_fim'])      ? $_GET['data_fim']            : null,
+    $pagina,
+    $porPagina
+]);
+$resultados = $stmt->fetchAll(PDO::FETCH_ASSOC);
+$stmt->closeCursor(); // obrigatório antes de outro CALL na mesma conexão
 
-        // FILTRO DE ABAS: 'arquivadas' vs 'ativas' (Padrão)
-        $exibir = $_GET['exibir'] ?? 'ativas';
-        if ($exibir === 'arquivadas') {
-            $sql .= " AND m.status = 'Arquivada'";
-        } else {
-            // Em 'ativas', mostra apenas as 'Pendente' e 'Respondida' (oculta as Arquivadas)
-            $sql .= " AND m.status != 'Arquivada'";
-        }
+// Total de páginas vem da segunda procedure
+$stmtTotal = $db->prepare("CALL sp_contar_manifestacoes(?, ?, ?, ?, ?, ?)");
+$stmtTotal->execute([
+    $_GET['exibir']        ?? 'ativas',
+    !empty($_GET['secretaria_id']) ? (int) $_GET['secretaria_id'] : null,
+    !empty($_GET['status'])        ? $_GET['status']              : null,
+    !empty($_GET['busca'])         ? $_GET['busca']               : null,
+    !empty($_GET['data_inicio'])   ? $_GET['data_inicio']         : null,
+    !empty($_GET['data_fim'])      ? $_GET['data_fim']            : null
+]);
+$total = (int) ($stmtTotal->fetch(PDO::FETCH_ASSOC)['total_registros'] ?? 0);
+$stmtTotal->closeCursor();
 
-        if (!empty($_GET['id'])) {
-            $sql .= " AND m.id = :id";
-            $params[':id'] = $_GET['id'];
-        }
-
-        if (!empty($_GET['secretaria_id'])) {
-            $sql .= " AND m.secretaria_id = :secretaria_id";
-            $params[':secretaria_id'] = $_GET['secretaria_id'];
-        }
-
-        if (!empty($_GET['data_inicio'])) {
-            $sql .= " AND DATE(m.data_criacao) >= :data_inicio";
-            $params[':data_inicio'] = $_GET['data_inicio'];
-        }
-
-        if (!empty($_GET['data_fim'])) {
-            $sql .= " AND DATE(m.data_criacao) <= :data_fim";
-            $params[':data_fim'] = $_GET['data_fim'];
-        }
-
-        $sql .= " ORDER BY m.data_criacao DESC";
-
-        $stmt = $db->prepare($sql);
-        $stmt->execute($params);
-        $resultados = $stmt->fetchAll(PDO::FETCH_ASSOC);
-
-        echo json_encode($resultados);
+echo json_encode([
+    "dados"      => $resultados,
+    "pagina"     => $pagina,
+    "por_pagina" => $porPagina,
+    "total"      => $total,
+    "paginas"    => (int) ceil($total / $porPagina)
+]);
 
     } elseif ($metodo === 'PUT') {
         $dados = json_decode(file_get_contents("php://input"), true);

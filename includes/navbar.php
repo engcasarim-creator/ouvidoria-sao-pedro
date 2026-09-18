@@ -21,6 +21,9 @@ if (session_status() === PHP_SESSION_NONE) {
                     <li class="nav-item">
                         <a class="nav-link text-white fw-bold" href="dashboard.php"><i class="bi bi-speedometer2 me-1"></i> Painel Admin</a>
                     </li>
+                    <li class="nav-item">
+    <a class="nav-link text-white" href="cadastros.php"><i class="bi bi-gear me-1"></i> Cadastros</a>
+</li>
                     <li class="nav-item ms-lg-2">
                         <a class="btn btn-outline-light btn-sm" href="api/login.php?action=logout">
                             <i class="bi bi-box-arrow-right me-1"></i> Sair (<?= htmlspecialchars($_SESSION['usuario_nome']) ?>)
